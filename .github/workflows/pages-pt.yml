@@ -1,0 +1,64 @@
+name: Pages PT Preview
+
+on:
+  push:
+    branches: [feat/pt-pages-preview]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-pt
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Pages serves the site at /<repo>/, so the base path must match the repo name.
+      # The --base flag overrides base: '/pt/' in apps/pt/vite.config.ts.
+      - name: Build PT app
+        env:
+          NODE_ENV: production
+        run: npx vite build apps/pt --base=/DRTECHCATE/pt/
+
+      - name: Assemble Pages artifact
+        run: |
+          mkdir -p _site/pt
+          cp -r dist/apps/pt/. _site/pt/
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
